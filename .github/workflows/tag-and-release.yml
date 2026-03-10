@@ -1,0 +1,96 @@
+name: Tag Version & Release
+on:
+  push:
+    branches: 
+    - master
+
+jobs:
+  create_and_publish_nuget_package:
+    name: Build, Create and Publish NuGet Package
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      packages: write
+      id-token: write 
+    if: github.ref == 'refs/heads/master'
+    env:
+      NUGET_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+      PROJECT_NAME: TFM.ApplePay
+      NUGET_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Get Version
+      id: get-version
+      uses: kzrnm/get-net-sdk-project-versions-action@v1
+      with:
+        proj-path: '${{ env.PROJECT_NAME }}.csproj'
+
+    - name: Check if release already exists
+      id: check-release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VERSION: ${{ steps.get-version.outputs.assembly-version }}
+      run: |
+        if gh release view "v${VERSION}" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+          echo "Release v${VERSION} already exists. Skipping."
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "No existing release for v${VERSION}. Proceeding."
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Setup .NET
+      if: steps.check-release.outputs.exists == 'false'
+      uses: actions/setup-dotnet@v3
+      with:
+        source-url: ${{ env.NUGET_URL }}
+
+    - name: Build
+      if: steps.check-release.outputs.exists == 'false'
+      run: dotnet build --configuration Release
+
+    - name: Package NuGet Package
+      if: steps.check-release.outputs.exists == 'false'
+      run: >
+        dotnet pack --no-restore --no-build --configuration Release 
+        -p:PackageVersion=${{ steps.get-version.outputs.assembly-version }} --output .
+     
+    - name: Publish NuGet Package to Github Packages
+      if: steps.check-release.outputs.exists == 'false'
+      run: >
+        dotnet nuget push ${{ env.PROJECT_NAME }}.${{ steps.get-version.outputs.assembly-version }}.nupkg
+        -s ${{ env.NUGET_URL }} 
+        --api-key ${{ secrets.GITHUB_TOKEN }}
+
+    - name: NuGet login (OIDC → temp API key)
+      if: steps.check-release.outputs.exists == 'false'
+      uses: NuGet/login@v1
+      id: login
+      with:
+        user: ${{ secrets.NUGET_USER }} 
+
+    - name: NuGet push
+      if: steps.check-release.outputs.exists == 'false'
+      run: dotnet nuget push ${{ env.PROJECT_NAME }}.${{ steps.get-version.outputs.assembly-version }}.nupkg --api-key ${{steps.login.outputs.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json
+
+    - name: Create version branch
+      if: steps.check-release.outputs.exists == 'false'
+      env:
+        VERSION: ${{ steps.get-version.outputs.assembly-version }}
+      run: |
+        git checkout -b "v${VERSION}"
+        git push origin "v${VERSION}"
+
+    - name: Create GitHub Release
+      if: steps.check-release.outputs.exists == 'false'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VERSION: ${{ steps.get-version.outputs.assembly-version }}
+      run: |
+        gh release create "v${VERSION}" \
+          --repo "${{ github.repository }}" \
+          --title "v${VERSION}" \
+          --generate-notes

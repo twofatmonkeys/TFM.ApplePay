@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+	<TargetFramework>net8.0</TargetFramework>
+	<Title>TFM.ApplePay</Title>
+	<Authors>Two Fat Monkeys</Authors>
+	<Company>Two Fat Monkeys</Company>
+	<Description>C# .NETCore Apple Pay library</Description>
+	<ImplicitUsings>enable</ImplicitUsings>
+	<Nullable>enable</Nullable>
+	<RootNamespace>TFM.ApplePay</RootNamespace>
+	<AssemblyVersion>1.26.69.1</AssemblyVersion>
+	<FileVersion>1.26.69.1</FileVersion>
+	<VersionPrefix>$(AssemblyVersion)</VersionPrefix>
+	<PackageReadmeFile>README.md</PackageReadmeFile>
+	<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+	<PackageIcon>icon.png</PackageIcon>
+	<PackageOutputPath>nuget\</PackageOutputPath>
+	<RepositoryUrl>https://github.com/twofatmonkeys/TFM.ApplePay</RepositoryUrl>
+	<IncludeSymbols>true</IncludeSymbols>
+	<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+	<AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+  </PropertyGroup>
+
+  <ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+	<ItemGroup>
+		<None Include="images\icon.png" Pack="true" PackagePath="\" />
+		<None Include="LICENSE.txt">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+		<PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.3" />
+		<None Update="README.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+
+
+
+</Project>
