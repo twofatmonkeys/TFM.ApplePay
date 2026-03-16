@@ -5,12 +5,12 @@
 	<Title>TFM.ApplePay</Title>
 	<Authors>Two Fat Monkeys</Authors>
 	<Company>Two Fat Monkeys</Company>
-	<Description>C# .NETCore Apple Pay library</Description>
+	<Description>A full-stack ASP.NET Core library for integrating Apple Pay on any ASP.NET Core website. Provides models, certificate-based merchant validation, server-side token decryption, a Tag Helper for the Apple Pay button, and an abstract payment gateway interface.</Description>
 	<ImplicitUsings>enable</ImplicitUsings>
 	<Nullable>enable</Nullable>
 	<RootNamespace>TFM.ApplePay</RootNamespace>
-	<AssemblyVersion>1.26.69.1</AssemblyVersion>
-	<FileVersion>1.26.69.1</FileVersion>
+	<AssemblyVersion>1.26.75.1</AssemblyVersion>
+	<FileVersion>1.26.75.1</FileVersion>
 	<VersionPrefix>$(AssemblyVersion)</VersionPrefix>
 	<PackageReadmeFile>README.md</PackageReadmeFile>
 	<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
