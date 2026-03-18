@@ -9,8 +9,8 @@
 	<ImplicitUsings>enable</ImplicitUsings>
 	<Nullable>enable</Nullable>
 	<RootNamespace>TFM.ApplePay</RootNamespace>
-	<AssemblyVersion>1.26.75.1</AssemblyVersion>
-	<FileVersion>1.26.75.1</FileVersion>
+	<AssemblyVersion>1.26.77.1</AssemblyVersion>
+	<FileVersion>1.26.77.1</FileVersion>
 	<VersionPrefix>$(AssemblyVersion)</VersionPrefix>
 	<PackageReadmeFile>README.md</PackageReadmeFile>
 	<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>

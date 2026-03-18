@@ -24,6 +24,7 @@ public static class ServiceCollectionExtensions
         var currencyCode = Environment.GetEnvironmentVariable("APPLEPAY_CURRENCY_CODE") ?? "AUD";
         var supportedNetworks = Environment.GetEnvironmentVariable("APPLEPAY_SUPPORTED_NETWORKS")?.Split(',').Select(s => s.Trim()).ToArray();
         var merchantCapabilities = Environment.GetEnvironmentVariable("APPLEPAY_MERCHANT_CAPABILITIES")?.Split(',').Select(s => s.Trim()).ToArray();
+        var merchantValidationUrl = Environment.GetEnvironmentVariable("APPLEPAY_MERCHANT_VALIDATION_URL");
         return services.AddApplePay(options =>
         {
             options.MerchantId = merchantID;
@@ -39,7 +40,9 @@ public static class ServiceCollectionExtensions
                 options.SupportedNetworks = supportedNetworks;
             if(merchantCapabilities != null)
                 options.MerchantCapabilities = merchantCapabilities;
-            
+            if(merchantValidationUrl != null)
+                options.ApplePayMerchantValidationUrl = merchantValidationUrl;
+
         });
     }
 
