@@ -16,4 +16,11 @@ public interface IApplePayProcessor
         ApplePayPaymentContact? billingContact,
         ApplePayPaymentContact? shippingContact,
         CancellationToken cancellationToken = default);
+
+    Task<PaymentAuthorizationResult> ProcessEncryptedPaymentAsync(
+        ApplePayPaymentToken encryptedToken,
+        ApplePayPaymentRequest originalRequest,
+        ApplePayPaymentContact? billingContact,
+        ApplePayPaymentContact? shippingContact,
+        CancellationToken cancellationToken = default);
 }

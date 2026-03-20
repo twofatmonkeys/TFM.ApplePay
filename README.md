@@ -5,10 +5,11 @@ A full-stack ASP.NET Core library for integrating Apple Pay on any ASP.NET Core 
 ## Features
 
 - **Merchant Validation** — Certificate-based (.p12) validation with Apple's servers, with SSRF protection
-- **Token Decryption** — Full EC_v1 server-side decryption (ECDH key agreement, NIST KDF, AES-256-GCM)
+- **Token Decryption** — Full EC_v1 server-side decryption (ECDH key agreement, NIST KDF, AES-256-GCM), or pass encrypted tokens directly to your gateway
 - **Tag Helper** — Drop-in `<apple-pay-button>` Razor Tag Helper with Apple's JS SDK
 - **Gateway Agnostic** — Implement `IApplePayProcessor` to plug in any payment processor (Stripe, Adyen, Worldpay, etc.)
 - **DI Integration** — Clean `IServiceCollection` extension methods for registration (lambda, config section, or environment variables)
+- **Startup Validation** — Options are validated at startup via `IValidateOptions` so misconfigurations fail fast
 
 ## Installation
 
@@ -33,11 +34,16 @@ builder.Services.AddApplePay(options =>
     options.MerchantIdentityCertificatePath = "/certs/merchant-identity.p12";
     options.MerchantIdentityCertificatePassword = "password";
 
-    // Payment Processing Certificate — used for token decryption
+    // Payment Processing Certificate — used for token decryption (only required when DecryptTokensLocally is true)
     options.PaymentProcessingCertificatePath = "/certs/payment-processing.p12";
     options.PaymentProcessingCertificatePassword = "password";
 
-    // Payment defaults
+    // Token decryption mode (default: true)
+    // Set to false to skip server-side decryption and pass the encrypted token
+    // directly to your IApplePayProcessor.ProcessEncryptedPaymentAsync() method
+    options.DecryptTokensLocally = true;
+
+    // Payment defaults — auto-detected from system locale if not set
     options.CountryCode = "AU";
     options.CurrencyCode = "AUD";
     options.SupportedNetworks = ["visa", "masterCard"];
@@ -64,6 +70,7 @@ builder.Services.AddApplePay(builder.Configuration);
     "MerchantIdentityCertificatePassword": "password",
     "PaymentProcessingCertificatePath": "/certs/payment-processing.p12",
     "PaymentProcessingCertificatePassword": "password",
+    "DecryptTokensLocally": true,
     "CountryCode": "AU",
     "CurrencyCode": "AUD",
     "SupportedNetworks": ["visa", "masterCard"],
@@ -86,11 +93,14 @@ builder.Services.AddApplePay(); // reads from environment variables
 | `APPLEPAY_MERCHANT_ID_CERTIFICATE_PATH` | No | `/app/config/apple-merchant-identity.p12` |
 | `APPLEPAY_MERCHANT_ID_CERTIFICATE_PASSWORD` | Yes | — |
 | `APPLEPAY_PAYMENT_CERTIFICATE_PATH` | No | `/app/config/apple-payment.p12` |
-| `APPLEPAY_PAYMENT_CERTIFICATE_PASSWORD` | Yes | — |
-| `APPLEPAY_COUNTRY_CODE` | No | `AU` |
-| `APPLEPAY_CURRENCY_CODE` | No | `AUD` |
+| `APPLEPAY_PAYMENT_CERTIFICATE_PASSWORD` | When decrypting locally | — |
+| `APPLEPAY_DECRYPT_TOKENS_LOCALLY` | No | `true` (auto `false` if payment cert password unset) |
+| `APPLEPAY_COUNTRY_CODE` | No | System locale |
+| `APPLEPAY_CURRENCY_CODE` | No | System locale |
 | `APPLEPAY_SUPPORTED_NETWORKS` | No | `visa,masterCard` |
 | `APPLEPAY_MERCHANT_CAPABILITIES` | No | `supports3DS` |
+| `APPLEPAY_REQUIRED_BILLING_CONTACT_FIELDS` | No | (empty) |
+| `APPLEPAY_REQUIRED_SHIPPING_CONTACT_FIELDS` | No | (empty) |
 
 ### 2. Add the Tag Helper to your Razor view
 
@@ -135,7 +145,11 @@ Then add the button:
 
 ### 3. Implement `IApplePayProcessor`
 
-This is the only interface you need to implement. It receives the decrypted card details along with billing/shipping contacts and sends them to your chosen payment processor:
+This is the only interface you need to implement. It has two methods — implement whichever one matches your `DecryptTokensLocally` setting:
+
+**Option A: Local decryption (`DecryptTokensLocally = true`, default)**
+
+The library decrypts the token and passes you the card details:
 
 ```csharp
 using TFM.ApplePay.Interfaces;
@@ -159,25 +173,48 @@ public class MyPaymentProcessor : IApplePayProcessor
         //   .PaymentCredential.OnlinePaymentCryptogram — 3DS cryptogram
         //   .PaymentCredential.EciIndicator   — ECI value
 
-        // billingContact / shippingContact contain the customer's
-        // name, email, phone, and address if requested via
-        // RequiredBillingContactFields / RequiredShippingContactFields
-
         // Send these to your payment processor...
 
         return PaymentAuthorizationResult.Success();
+    }
 
-        // Or with order details:
-        // return PaymentAuthorizationResult.Success(new ApplePayPaymentOrderDetails
-        // {
-        //     OrderTypeIdentifier = "com.example.order",
-        //     OrderIdentifier = "order-123",
-        //     WebServiceURL = "https://example.com/orders",
-        //     AuthenticationToken = "token-abc"
-        // });
+    public Task<PaymentAuthorizationResult> ProcessEncryptedPaymentAsync(
+        ApplePayPaymentToken encryptedToken,
+        ApplePayPaymentRequest originalRequest,
+        ApplePayPaymentContact? billingContact,
+        ApplePayPaymentContact? shippingContact,
+        CancellationToken cancellationToken = default)
+        => throw new NotImplementedException(); // Not called when DecryptTokensLocally = true
+}
+```
 
-        // Or on failure:
-        // return PaymentAuthorizationResult.Failure("Payment declined.");
+**Option B: Gateway-side decryption (`DecryptTokensLocally = false`)**
+
+The encrypted token is passed directly to your gateway (useful when your payment processor handles Apple Pay tokens natively):
+
+```csharp
+public class MyPaymentProcessor : IApplePayProcessor
+{
+    public Task<PaymentAuthorizationResult> ProcessPaymentAsync(
+        DecryptedPaymentData decryptedToken,
+        ApplePayPaymentRequest originalRequest,
+        ApplePayPaymentContact? billingContact,
+        ApplePayPaymentContact? shippingContact,
+        CancellationToken cancellationToken = default)
+        => throw new NotImplementedException(); // Not called when DecryptTokensLocally = false
+
+    public async Task<PaymentAuthorizationResult> ProcessEncryptedPaymentAsync(
+        ApplePayPaymentToken encryptedToken,
+        ApplePayPaymentRequest originalRequest,
+        ApplePayPaymentContact? billingContact,
+        ApplePayPaymentContact? shippingContact,
+        CancellationToken cancellationToken = default)
+    {
+        // encryptedToken contains the raw Apple Pay token
+        // Forward it to your payment processor (e.g. Stripe, Adyen)
+        // which handles decryption on their end
+
+        return PaymentAuthorizationResult.Success();
     }
 }
 ```
@@ -243,13 +280,14 @@ Consumer App
     │       │
     │       ├── validate-merchant ──► ApplePayMerchantValidationService ──► Apple servers
     │       │
-    │       ├── process-payment  ──► ApplePayTokenDecryptionService (ECDH + KDF + AES-GCM)
-    │       │                               │
-    │       │                               ▼
-    │       │                       IApplePayProcessor.ProcessPaymentAsync()
-    │       │                               │
-    │       │                               ▼
-    │       │                       Consumer's gateway implementation
+    │       ├── process-payment
+    │       │       │
+    │       │       ├── DecryptTokensLocally = true (default)
+    │       │       │       └──► ApplePayTokenDecryptionService (ECDH + KDF + AES-GCM)
+    │       │       │               └──► IApplePayProcessor.ProcessPaymentAsync()
+    │       │       │
+    │       │       └── DecryptTokensLocally = false
+    │       │               └──► IApplePayProcessor.ProcessEncryptedPaymentAsync()
     │       │
     │       └── log-message      ──► ILogger (server-side diagnostics)
     │
@@ -261,7 +299,7 @@ Consumer App
 - .NET 8.0 or later
 - Apple Developer account with Apple Pay configured
 - Merchant Identity Certificate (.p12) — for merchant validation
-- Payment Processing Certificate (.p12) — for token decryption
+- Payment Processing Certificate (.p12) — for token decryption (only required when `DecryptTokensLocally = true`)
 - Domain registered and verified in the Apple Developer portal
 
 ## License

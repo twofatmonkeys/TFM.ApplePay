@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace TFM.ApplePay.Models.PaymentToken;
@@ -18,4 +19,9 @@ public class ApplePayPaymentData
 
     [JsonPropertyName("version")]
     public string Version { get; set; } = string.Empty;
+
+    public string ToJsonString()
+    {
+        return JsonSerializer.Serialize(this);
+    }
 }

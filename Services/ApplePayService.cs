@@ -35,28 +35,44 @@ public class ApplePayService(
         ApplePayPaymentRequest paymentRequest,
         CancellationToken cancellationToken = default)
     {
-        Models.DecryptedToken.DecryptedPaymentData decryptedData;
-        try
+        if (_options.DecryptTokensLocally)
         {
-            decryptedData = _tokenDecryption.DecryptToken(token);
+            Models.DecryptedToken.DecryptedPaymentData decryptedData;
+            try
+            {
+                decryptedData = _tokenDecryption.DecryptToken(token);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to decrypt Apple Pay token");
+                return PaymentAuthorizationResult.Failure("Token decryption failed.");
+            }
+
+            try
+            {
+                return await _paymentGateway.ProcessPaymentAsync(
+                    decryptedData, paymentRequest, billingContact, shippingContact, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Payment gateway processing failed");
+                return PaymentAuthorizationResult.Failure("Payment processing error.");
+            }
         }
-        catch (Exception ex)
+        else
         {
-            _logger.LogError(ex, "Failed to decrypt Apple Pay token");
-            return PaymentAuthorizationResult.Failure("Token decryption failed.");
+            try
+            {
+                return await _paymentGateway.ProcessEncryptedPaymentAsync(
+                    token, paymentRequest, billingContact, shippingContact, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Payment gateway processing failed");
+                return PaymentAuthorizationResult.Failure("Payment processing error.");
+            }
+        }
         }
 
-        try
-        {
-            return await _paymentGateway.ProcessPaymentAsync(
-                decryptedData, paymentRequest, billingContact, shippingContact, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Payment gateway processing failed");
-            return PaymentAuthorizationResult.Failure("Payment processing error.");
-        }
+
     }
-
-
-}
